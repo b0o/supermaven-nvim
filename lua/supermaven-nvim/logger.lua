@@ -22,7 +22,7 @@ local join_path = function(...)
   if vim.version().minor >= 10 then
     return table.concat(vim.iter({ ... }):flatten():totable(), path_sep):gsub(path_sep .. "+", path_sep)
   end
-  return table.concat(vim.tbl_flatten({ ... }), path_sep):gsub(path_sep .. "+", path_sep)
+  return table.concat(vim.iter({ ... }):flatten():totable(), path_sep):gsub(path_sep .. "+", path_sep)
 end
 
 --- Creates a log file if it doesn't exist
@@ -62,7 +62,7 @@ function log:write_log_file(level, msg)
   end
   local file = io.open(log_path, "a")
   if file == nil then
-    vim.api.nvim_err_writeln("Failed to open log file: " .. log_path)
+    vim.notify_once("Failed to open log file: " .. log_path, vim.log.levels.WARN, { title = "Supermaven" })
     return
   end
   file:write(string.format("[%-6s %s] %s\n", level:upper(), os.date(), msg))
@@ -73,26 +73,28 @@ end
 ---@param level LogLevel: The log level
 ---@param msg string: The log message
 function log:add_entry(level, msg)
-  local conf = c.config
+  vim.schedule(function()
+    local conf = c.config
 
-  if not self.__notify_fmt then
-    self.__notify_fmt = function(message)
-      return string.format(string.format("[supermaven-nvim] %s", message))
+    if not self.__notify_fmt then
+      self.__notify_fmt = function(message)
+        return string.format(string.format("[supermaven-nvim] %s", message))
+      end
     end
-  end
 
-  if conf.log_level == "off" or level_values[conf.log_level] == nil then
-    return
-  end
+    if conf.log_level == "off" or level_values[conf.log_level] == nil then
+      return
+    end
 
-  if self.__log_file == nil then
-    self.__log_file = create_log_file()
-  end
+    if self.__log_file == nil then
+      self.__log_file = create_log_file()
+    end
 
-  self:write_log_file(level, msg)
-  if level_values[level] >= level_values[conf.log_level] then
-    print(self.__notify_fmt(msg))
-  end
+    self:write_log_file(level, msg)
+    if level_values[level] >= level_values[conf.log_level] then
+      print(self.__notify_fmt(msg))
+    end
+  end)
 end
 
 --- Returns the path to the log file
@@ -110,7 +112,7 @@ end
 ---@param msg string: The log message
 function log:warn(msg)
   self:add_entry("warn", msg)
-  vim.api.nvim_notify(self.__notify_fmt(msg), vim.log.levels.WARN, { title = "Supermaven" })
+  vim.api.notify(self.__notify_fmt(msg), vim.log.levels.WARN, { title = "Supermaven" })
 end
 
 --- Logs an error message to the log file
@@ -118,7 +120,7 @@ end
 ---@param msg string: The log message
 function log:error(msg)
   self:add_entry("error", msg)
-  vim.api.nvim_notify(self.__notify_fmt(msg), vim.log.levels.ERROR, { title = "Supermaven" })
+  vim.api.notify(self.__notify_fmt(msg), vim.log.levels.ERROR, { title = "Supermaven" })
 end
 
 --- Logs an informational message to the log file
